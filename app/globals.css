@@ -244,16 +244,29 @@ select:disabled, input:disabled { opacity: 0.45; cursor: not-allowed; }
   border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid var(--playhead);
 }
 
-/* ---------- Narrow screens ---------- */
+/* ---------- Narrow screens: the editor is exactly one screen tall. Video, controls and
+   timeline stay pinned on top; only the panel below scrolls, so the video never leaves view. ---------- */
 @media (max-width: 960px) {
-  .ed { height: auto; min-height: 100vh; overflow: visible; }
+  .ed { height: 100vh; height: 100dvh; }
+  .ed-top { padding: 8px 10px; gap: 8px; }
+  .ed-top .ghost { padding: 6px 8px; }
   .ed-main { display: contents; }
-  .ed-stage { order: 1; }
+  .ed-stage { order: 1; flex: none; padding: 8px 10px 6px; gap: 6px; }
+  .stage { flex: none; }
+  .player video { max-height: 36vh; max-height: 36dvh; }
+  .controls-bar { gap: 4px; }
+  .controls-bar .icon-btn { width: 30px; height: 30px; font-size: 13px; }
+  .controls-bar .time { font-size: 12px; margin-left: 4px; }
   .timeline { order: 2; }
-  .ed-side { order: 3; border-left: none; border-top: 1px solid var(--border); }
-  .player video { max-height: 60vh; }
-  .tab-body { overflow: visible; }
+  .tl-bar { flex-wrap: nowrap; overflow-x: auto; padding: 6px 10px; }
+  .tl-bar > * { flex: none; }
   .kbd-hint { display: none; }
+  .tl-inner { height: 76px; }
+  .tl-wave { top: 24px; height: 48px; }
+  .tl-block { top: 26px; height: 44px; }
+  .ed-side { order: 3; flex: 1; min-height: 0; border-left: none; border-top: 1px solid var(--border); }
+  .tab-body { padding: 10px; }
+  .tabs button { padding: 10px 6px; }
 }
 @media (max-width: 520px) {
   .controls { grid-template-columns: minmax(0, 1fr); }

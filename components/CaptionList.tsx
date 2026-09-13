@@ -17,6 +17,17 @@ interface Props {
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
+/** Scroll only the caption panel (never the page) so the row is visible — keeps the video on screen on phones. */
+function revealRow(list: HTMLElement, id: string, smooth: boolean) {
+  const row = list.querySelector<HTMLElement>(`[data-id="${id}"]`);
+  const panel = list.closest<HTMLElement>(".tab-body");
+  if (!row || !panel) return;
+  const r = row.getBoundingClientRect();
+  const p = panel.getBoundingClientRect();
+  if (r.top >= p.top && r.bottom <= p.bottom) return;
+  panel.scrollTo({ top: panel.scrollTop + (r.top - p.top) - p.height / 3, behavior: smooth ? "smooth" : "auto" });
+}
+
 interface Actions {
   update: (id: string, patch: Partial<Segment>, key?: string) => void;
   remove: (id: string) => void;
@@ -64,12 +75,12 @@ export default function CaptionList({ segments, activeId, selectedId, onSelect, 
   useEffect(() => {
     const list = listRef.current;
     if (!activeId || !list || list.contains(document.activeElement)) return;
-    list.querySelector(`[data-id="${activeId}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    revealRow(list, activeId, true);
   }, [activeId]);
 
   // Selecting from the timeline scrolls the list to it.
   useEffect(() => {
-    if (selectedId) listRef.current?.querySelector(`[data-id="${selectedId}"]`)?.scrollIntoView({ block: "nearest" });
+    if (selectedId && listRef.current) revealRow(listRef.current, selectedId, false);
   }, [selectedId]);
 
   if (!segments.length) {
