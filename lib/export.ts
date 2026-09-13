@@ -10,7 +10,7 @@ import {
   Output,
   Quality,
 } from "mediabunny";
-import { fontSpec, renderCaptions } from "./draw";
+import { loadCaptionFont, renderCaptions } from "./draw";
 import type { SpeechMap } from "./speech";
 import type { CaptionStyle, Segment } from "./types";
 
@@ -45,7 +45,7 @@ const abortError = () => new DOMException("Export cancelled", "AbortError");
  * Fallback (browsers without WebCodecs): real-time playback + MediaRecorder.
  */
 export async function exportCaptionedVideo(opts: ExportOptions): Promise<ExportResult> {
-  await document.fonts.load(fontSpec(opts.style));
+  await loadCaptionFont(opts.style);
   const o = { ...opts, file: await ensureReadable(opts.file) };
   const isAbort = (e: unknown) => opts.signal.aborted || (e instanceof DOMException && e.name === "AbortError");
 

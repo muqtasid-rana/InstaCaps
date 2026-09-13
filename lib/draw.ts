@@ -33,6 +33,21 @@ export function fontSpec(style: CaptionStyle, px = 40) {
   return `${f.fixedWeight ?? style.weight} ${px}px ${f.family}`;
 }
 
+/**
+ * Download the caption font before drawing. Only the primary family is requested: next/font's
+ * fallback face is `local("Arial")`, which doesn't exist on Android, and a failed face makes
+ * document.fonts.load() reject with "NetworkError". A font problem must never stop an export.
+ */
+export async function loadCaptionFont(style: CaptionStyle) {
+  const f = FONTS[style.font] ?? FONTS.interTight;
+  const primary = f.family.split(",")[0].trim();
+  try {
+    await document.fonts.load(`${f.fixedWeight ?? style.weight} 40px ${primary}`);
+  } catch (e) {
+    console.warn("[fonts] caption font failed to load; using fallback", e);
+  }
+}
+
 export const splitWords = (text: string) => text.split(/\s+/).filter(Boolean);
 
 // ---------- timing ----------

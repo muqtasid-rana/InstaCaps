@@ -9,7 +9,7 @@ import Timeline from "./Timeline";
 import { decodeMono, encodeWav, SAMPLE_RATE } from "@/lib/audio";
 import { MAX_WORDS, rechunk } from "@/lib/chunking";
 import { Clock } from "@/lib/clock";
-import { fontSpec, renderCaptions, splitWords, wordTimes } from "@/lib/draw";
+import { loadCaptionFont, renderCaptions, splitWords, wordTimes } from "@/lib/draw";
 import { useHistory } from "@/lib/history";
 import { alignSegments, analyzeSpeech, type SpeechMap } from "@/lib/speech";
 import { fmtTime } from "@/lib/subtitles";
@@ -105,7 +105,7 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
   }, [segments, style, speech]);
 
   useEffect(() => {
-    void document.fonts.load(fontSpec(style)).then(() => (dirty.current = true));
+    void loadCaptionFont(style).then(() => (dirty.current = true));
   }, [style.font, style.weight]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Draw at the canvas's on-screen size (not the video's full resolution) — much cheaper for 4K sources.
