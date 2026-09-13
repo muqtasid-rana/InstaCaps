@@ -46,15 +46,51 @@ const abortError = () => new DOMException("Export cancelled", "AbortError");
  */
 export async function exportCaptionedVideo(opts: ExportOptions): Promise<ExportResult> {
   await document.fonts.load(fontSpec(opts.style));
+  const o = { ...opts, file: await ensureReadable(opts.file) };
+  const isAbort = (e: unknown) => opts.signal.aborted || (e instanceof DOMException && e.name === "AbortError");
+
+  let firstError: unknown = null;
   if (typeof VideoEncoder !== "undefined" && typeof VideoDecoder !== "undefined") {
     try {
-      return await exportWithWebCodecs(opts);
+      return await exportWithWebCodecs(o);
     } catch (e) {
-      if (opts.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) throw abortError();
+      if (isAbort(e)) throw abortError();
+      firstError = e;
       console.warn("[export] WebCodecs export failed, falling back to MediaRecorder:", e);
     }
   }
-  return recordInRealTime(opts);
+  try {
+    return await recordInRealTime(o);
+  } catch (e) {
+    if (isAbort(e)) throw abortError();
+    console.error("[export] fallback failed:", e);
+    if (!firstError) throw e;
+    throw new Error(`Export failed: ${describeError(firstError)} (fallback: ${describeError(e)})`);
+  }
+}
+
+export const describeError = (e: unknown) =>
+  e instanceof Error ? (e.name && e.name !== "Error" ? `${e.name}: ${e.message}` : e.message) : String(e);
+
+const COPY_LIMIT = 300 * 1024 * 1024;
+
+/**
+ * Make sure the original video can still be read, and (up to 300 MB) keep it in memory for the
+ * export. Phones can lose access to a file picked a while ago; better to say so up front than fail
+ * halfway through with an obscure read error.
+ */
+async function ensureReadable(file: Blob): Promise<Blob> {
+  try {
+    if (file.size <= COPY_LIMIT) return new Blob([await file.arrayBuffer()], { type: file.type });
+    await file.slice(0, 65536).arrayBuffer();
+    await file.slice(Math.max(0, file.size - 65536)).arrayBuffer();
+    return file;
+  } catch (e) {
+    console.error("[export] source video unreadable:", e);
+    throw new Error(
+      "The browser can no longer read the original video file (phones do this after a while, or if the file was moved). Tap ← Projects, open the video again, then export once more.",
+    );
+  }
 }
 
 async function exportWithWebCodecs({ file, segments, style, speech, quality, onProgress, signal }: ExportOptions): Promise<ExportResult> {

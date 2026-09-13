@@ -33,12 +33,21 @@ export function fmtTime(t: number, digits = 1) {
   return `${m}:${s}`;
 }
 
-export function download(data: Blob | string, filename: string) {
-  const blob = typeof data === "string" ? new Blob([data], { type: "text/plain;charset=utf-8" }) : data;
-  const url = URL.createObjectURL(blob);
+/** Start a download of an object URL. The caller decides when to revoke it. */
+export function saveUrl(url: string, filename: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  a.remove();
+}
+
+export function download(data: Blob | string, filename: string) {
+  const blob = typeof data === "string" ? new Blob([data], { type: "text/plain;charset=utf-8" }) : data;
+  const url = URL.createObjectURL(blob);
+  saveUrl(url, filename);
+  // Revoking early makes the browser's download fail with "Network error" (e.g. while a
+  // "Save as" / "Download file?" prompt is open, or a big file is still being written).
+  setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000);
 }

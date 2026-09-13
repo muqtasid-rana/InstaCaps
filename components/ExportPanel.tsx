@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { exportCaptionedVideo, type ExportQuality } from "@/lib/export";
+import { describeError, exportCaptionedVideo, type ExportQuality } from "@/lib/export";
 import type { SpeechMap } from "@/lib/speech";
-import { download, toSRT, toTXT, toVTT } from "@/lib/subtitles";
+import { download, saveUrl, toSRT, toTXT, toVTT } from "@/lib/subtitles";
 import type { CaptionStyle, Segment } from "@/lib/types";
 
 interface Props {
@@ -16,19 +16,43 @@ interface Props {
   onError: (msg: string) => void;
 }
 
+interface Result {
+  url: string;
+  blob: Blob;
+  filename: string;
+  info: string;
+}
+
 export default function ExportPanel({ video, name, segments, style, speech, onBusy, onError }: Props) {
   const [quality, setQuality] = useState<ExportQuality>("high");
   const [progress, setProgress] = useState<number | null>(null);
-  const [status, setStatus] = useState("");
+  const [result, setResult] = useState<Result | null>(null);
+  const [canShare, setCanShare] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    try {
+      setCanShare(!!navigator.canShare?.({ files: [new File([], "x.mp4", { type: "video/mp4" })] }));
+    } catch {
+      setCanShare(false);
+    }
+  }, []);
+
+  // The exported file stays available (for Save / Share) until it's replaced or the editor closes.
+  useEffect(() => () => {
+    if (result) URL.revokeObjectURL(result.url);
+  }, [result]);
+
+  // Editing after an export makes that file stale.
+  useEffect(() => setResult(null), [segments, style]);
 
   async function run() {
     const ac = new AbortController();
     abortRef.current = ac;
     onError("");
-    setStatus("");
+    setResult(null);
     setProgress(0);
     onBusy(true);
     const t0 = performance.now();
@@ -42,14 +66,27 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
         onProgress: setProgress,
         signal: ac.signal,
       });
-      download(blob, `${name}-captioned.${ext}`);
-      setStatus(`Done in ${((performance.now() - t0) / 1000).toFixed(1)} s · ${(blob.size / 1e6).toFixed(1)} MB · ${method}`);
+      const filename = `${name}-captioned.${ext}`;
+      const url = URL.createObjectURL(blob);
+      setResult({ url, blob, filename, info: `Done in ${((performance.now() - t0) / 1000).toFixed(1)} s · ${method}` });
+      // Desktop: download straight away. Phones: use the buttons below — a direct tap is more reliable there.
+      if (window.matchMedia("(pointer: fine)").matches) saveUrl(url, filename);
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) onError(e instanceof Error ? e.message : String(e));
+      if (!(e instanceof DOMException && e.name === "AbortError")) onError(describeError(e));
     } finally {
       abortRef.current = null;
       setProgress(null);
       onBusy(false);
+    }
+  }
+
+  async function share() {
+    if (!result) return;
+    const file = new File([result.blob], result.filename, { type: result.blob.type || "video/mp4" });
+    try {
+      await navigator.share({ files: [file], title: result.filename });
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) onError(`Sharing failed: ${describeError(e)}`);
     }
   }
 
@@ -76,8 +113,8 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
         </div>
         <div className="row">
           {progress === null ? (
-            <button className="primary wide" disabled={empty} onClick={run}>
-              ⬇ Export MP4
+            <button className={result ? "wide" : "primary wide"} disabled={empty} onClick={run}>
+              {result ? "Export again" : "⬇ Export MP4"}
             </button>
           ) : (
             <>
@@ -91,7 +128,19 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
             </>
           )}
         </div>
-        {status && <p className="notice">{status}</p>}
+        {result && progress === null && (
+          <div className="export-result">
+            <a className="btn primary wide" href={result.url} download={result.filename}>
+              ⬇ Save video · {(result.blob.size / 1e6).toFixed(1)} MB
+            </a>
+            {canShare && (
+              <button className="wide" onClick={share}>
+                Share / Save to Photos
+              </button>
+            )}
+            <p className="notice">{result.info}</p>
+          </div>
+        )}
       </section>
 
       <section className="panel-section">

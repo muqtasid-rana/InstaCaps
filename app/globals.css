@@ -203,6 +203,15 @@ select:disabled, input:disabled { opacity: 0.45; cursor: not-allowed; }
 .switch input:checked + span { background: var(--accent); }
 .switch input:checked + span::before { transform: translateX(14px); }
 
+a.btn {
+  display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+  border-radius: 8px; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
+}
+a.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+a.btn.primary:hover { background: var(--accent-2); }
+a.wide { width: 100%; }
+.export-result { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
 .panel-section { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 .panel-section:last-child { border-bottom: none; }
 .panel-section h4 { margin: 0 0 6px; font-size: 14px; }
