@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import type { SetWithHistory } from "@/lib/history";
 import { fmtTime } from "@/lib/subtitles";
 import { uid, type Segment } from "@/lib/types";
+import Icon from "./Icon";
 
 interface Props {
   segments: Segment[];
@@ -110,7 +111,8 @@ export default function CaptionList({ segments, activeId, selectedId, onSelect, 
         />
       ))}
       <button className="small ghost add-cap" onClick={() => actions.insertAfter(segments[segments.length - 1].id)}>
-        + Add caption at the end
+        <Icon name="plus" size={16} />
+        Add caption at the end
       </button>
     </div>
   );
@@ -131,7 +133,7 @@ const Row = memo(function Row({ seg, active, selected, isLast, actions, onSelect
   return (
     <div data-id={seg.id} className={`cap${active ? " active" : ""}${selected ? " selected" : ""}`} onMouseDown={() => onSelect(seg.id)}>
       <div className="cap-main">
-        <button className="cap-time" onClick={() => seek(seg.start + 0.001)} title="Jump here">
+        <button className="cap-time" onClick={() => seek(seg.start + 0.001)} aria-label={`Jump to ${fmtTime(seg.start)}`} title="Jump here">
           {fmtTime(seg.start)}
         </button>
         <textarea
@@ -139,20 +141,21 @@ const Row = memo(function Row({ seg, active, selected, isLast, actions, onSelect
           rows={1}
           value={seg.text}
           placeholder="Type caption…"
+          aria-label={`Caption at ${fmtTime(seg.start)}`}
           spellCheck={false}
           onChange={(e) => actions.update(seg.id, { text: e.target.value }, `text-${seg.id}`)}
         />
         <div className="cap-actions">
           {!isLast && (
-            <button className="icon" title="Merge with next caption" onClick={() => actions.mergeNext(seg.id)}>
-              ⤓
+            <button className="icon" aria-label="Merge with next caption" title="Merge with next caption" onClick={() => actions.mergeNext(seg.id)}>
+              <Icon name="merge" size={16} />
             </button>
           )}
-          <button className="icon" title="Add a caption after this one" onClick={() => actions.insertAfter(seg.id)}>
-            ＋
+          <button className="icon" aria-label="Add a caption after this one" title="Add a caption after this one" onClick={() => actions.insertAfter(seg.id)}>
+            <Icon name="plus" size={16} />
           </button>
-          <button className="icon danger" title="Delete (Del)" onClick={() => actions.remove(seg.id)}>
-            ✕
+          <button className="icon danger" aria-label="Delete caption" title="Delete (Del)" onClick={() => actions.remove(seg.id)}>
+            <Icon name="close" size={16} />
           </button>
         </div>
       </div>
@@ -181,25 +184,26 @@ const Row = memo(function Row({ seg, active, selected, isLast, actions, onSelect
 function TimeField({ label, value, onChange, onNow }: { label: string; value: number; onChange: (v: number) => void; onNow: () => void }) {
   return (
     <div className="tf">
-      <span>{label}</span>
-      <button className="icon" title="−50 ms" onClick={() => onChange(r3(Math.max(0, value - 0.05)))}>
-        −
+      <span aria-hidden="true">{label}</span>
+      <button className="icon" aria-label={`${label} 50 ms earlier`} title="−50 ms" onClick={() => onChange(r3(Math.max(0, value - 0.05)))}>
+        <Icon name="minus" size={16} />
       </button>
       <input
         type="number"
         step={0.01}
         min={0}
         value={value}
+        aria-label={`${label} time in seconds`}
         onChange={(e) => {
           const v = parseFloat(e.target.value);
           if (Number.isFinite(v)) onChange(Math.max(0, v));
         }}
       />
-      <button className="icon" title="+50 ms" onClick={() => onChange(r3(value + 0.05))}>
-        +
+      <button className="icon" aria-label={`${label} 50 ms later`} title="+50 ms" onClick={() => onChange(r3(value + 0.05))}>
+        <Icon name="plus" size={16} />
       </button>
-      <button className="icon" title="Set to playhead" onClick={onNow}>
-        ⌖
+      <button className="icon" aria-label={`Set ${label} to playhead`} title="Set to playhead" onClick={onNow}>
+        <Icon name="playhead" size={16} />
       </button>
     </div>
   );

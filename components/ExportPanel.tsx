@@ -5,6 +5,7 @@ import { describeError, exportCaptionedVideo, type ExportQuality } from "@/lib/e
 import type { SpeechMap } from "@/lib/speech";
 import { download, saveUrl, toSRT, toTXT, toVTT } from "@/lib/subtitles";
 import type { CaptionStyle, Segment } from "@/lib/types";
+import Icon from "./Icon";
 
 interface Props {
   video: Blob;
@@ -103,10 +104,10 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
         <div className="row">
           <span className="muted">Quality</span>
           <div className="seg-toggle">
-            <button className={quality === "high" ? "on" : ""} onClick={() => setQuality("high")}>
+            <button className={quality === "high" ? "on" : ""} aria-pressed={quality === "high"} onClick={() => setQuality("high")}>
               High
             </button>
-            <button className={quality === "max" ? "on" : ""} onClick={() => setQuality("max")}>
+            <button className={quality === "max" ? "on" : ""} aria-pressed={quality === "max"} onClick={() => setQuality("max")}>
               Max (bigger file)
             </button>
           </div>
@@ -114,7 +115,14 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
         <div className="row">
           {progress === null ? (
             <button className={result ? "wide" : "primary wide"} disabled={empty} onClick={run}>
-              {result ? "Export again" : "⬇ Export MP4"}
+              {result ? (
+                "Export again"
+              ) : (
+                <>
+                  <Icon name="download" size={16} />
+                  Export MP4
+                </>
+              )}
             </button>
           ) : (
             <>
@@ -131,11 +139,13 @@ export default function ExportPanel({ video, name, segments, style, speech, onBu
         {result && progress === null && (
           <div className="export-result">
             <a className="btn primary wide" href={result.url} download={result.filename}>
-              ⬇ Save video · {(result.blob.size / 1e6).toFixed(1)} MB
+              <Icon name="download" size={16} />
+              Save video · {(result.blob.size / 1e6).toFixed(1)} MB
             </a>
             {canShare && (
               <button className="wide" onClick={share}>
-                Share / Save to Photos
+                <Icon name="share" size={16} />
+                Share or save to Photos
               </button>
             )}
             <p className="notice">{result.info}</p>

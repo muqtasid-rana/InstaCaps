@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { refundGeneration, requireAccount, reserveGeneration } from "@/lib/server/account";
 import type { ChunkMode, Lang } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -101,6 +102,9 @@ export async function POST(req: Request) {
     );
   }
 
+  const account = await requireAccount(req);
+  if (account instanceof Response) return account;
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -117,6 +121,15 @@ export async function POST(req: Request) {
   }
   if (media.size > MAX_BYTES) {
     return Response.json({ error: "Audio is too large to process (max ~4 MB)." }, { status: 413 });
+  }
+
+  // Take one generation from the account's allowance before spending Gemini quota.
+  const usage = await reserveGeneration(account);
+  if (!usage) {
+    return Response.json(
+      { error: "You've used your free caption generations. More plans are coming soon.", code: "quota" },
+      { status: 403 },
+    );
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -137,9 +150,13 @@ export async function POST(req: Request) {
     });
 
     const text = res.text;
-    if (!text) return Response.json({ error: "Gemini returned an empty response. Try again." }, { status: 502 });
-    return Response.json({ segments: clean(JSON.parse(text), duration), model: MODEL });
+    if (!text) {
+      await refundGeneration(account);
+      return Response.json({ error: "Gemini returned an empty response. Try again." }, { status: 502 });
+    }
+    return Response.json({ segments: clean(JSON.parse(text), duration), model: MODEL, usage });
   } catch (err) {
+    await refundGeneration(account); // a failed transcription doesn't count
     const message = err instanceof Error ? err.message : String(err);
     console.error("[captions] Gemini request failed:", message);
     return Response.json({ error: `Gemini request failed: ${message}` }, { status: 502 });

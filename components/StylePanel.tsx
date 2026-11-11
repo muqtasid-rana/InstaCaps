@@ -39,6 +39,14 @@ const PRESETS: { name: string; style: CaptionStyle }[] = [
 
 const WEIGHTS = [400, 500, 600, 700, 800, 900];
 
+const COLOR_NAMES = {
+  color: "Text color",
+  shadowColor: "Shadow color",
+  strokeColor: "Outline color",
+  boxColor: "Box color",
+  highlightColor: "Highlight color",
+} as const;
+
 interface Props {
   style: CaptionStyle;
   setStyle: Dispatch<SetStateAction<CaptionStyle>>;
@@ -48,7 +56,7 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   return (
     <div className="seg-toggle">
       {options.map(([v, label]) => (
-        <button key={v} className={value === v ? "on" : ""} onClick={() => onChange(v)}>
+        <button key={v} className={value === v ? "on" : ""} aria-pressed={value === v} onClick={() => onChange(v)}>
           {label}
         </button>
       ))}
@@ -68,10 +76,10 @@ function Section({ title, toggle, children }: { title: string; toggle?: ReactNod
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="switch">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" role="switch" aria-label={label} checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span />
     </label>
   );
@@ -83,11 +91,12 @@ function StylePanel({ style, setStyle }: Props) {
   type NumKey = { [K in keyof CaptionStyle]: CaptionStyle[K] extends number ? K : never }[keyof CaptionStyle];
   const range = (key: NumKey, label: string, min: number, max: number, step: number, fmt = (v: number) => String(v), disabled = false) => (
     <div className="control">
-      <label>
+      <label htmlFor={`st-${key}`}>
         <span>{label}</span>
         <span>{fmt(style[key])}</span>
       </label>
       <input
+        id={`st-${key}`}
         type="range"
         min={min}
         max={max}
@@ -100,7 +109,7 @@ function StylePanel({ style, setStyle }: Props) {
   );
 
   const color = (key: "color" | "shadowColor" | "strokeColor" | "boxColor" | "highlightColor", disabled = false) => (
-    <input type="color" value={style[key]} disabled={disabled} onChange={(e) => set(key, e.target.value)} />
+    <input type="color" aria-label={COLOR_NAMES[key]} value={style[key]} disabled={disabled} onChange={(e) => set(key, e.target.value)} />
   );
 
   const fixedWeight = FONTS[style.font]?.fixedWeight;
@@ -121,7 +130,7 @@ function StylePanel({ style, setStyle }: Props) {
             <label>
               <span>Font</span>
             </label>
-            <select value={style.font} onChange={(e) => set("font", e.target.value as FontKey)}>
+            <select aria-label="Font" value={style.font} onChange={(e) => set("font", e.target.value as FontKey)}>
               {(Object.keys(FONTS) as FontKey[]).map((k) => (
                 <option key={k} value={k}>
                   {FONTS[k].label}
@@ -133,7 +142,7 @@ function StylePanel({ style, setStyle }: Props) {
             <label>
               <span>Weight</span>
             </label>
-            <select value={fixedWeight ?? style.weight} disabled={!!fixedWeight} onChange={(e) => set("weight", Number(e.target.value))}>
+            <select aria-label="Weight" value={fixedWeight ?? style.weight} disabled={!!fixedWeight} onChange={(e) => set("weight", Number(e.target.value))}>
               {WEIGHTS.map((w) => (
                 <option key={w} value={w}>
                   {w}
@@ -174,7 +183,7 @@ function StylePanel({ style, setStyle }: Props) {
       </Section>
 
       <Section title="Animation">
-        <div className="control" style={{ marginBottom: 12 }}>
+        <div className="control control-spaced">
           <Segmented<AnimMode>
             value={style.animMode}
             options={[
@@ -190,7 +199,7 @@ function StylePanel({ style, setStyle }: Props) {
             <label>
               <span>Effect</span>
             </label>
-            <select value={style.animEffect} disabled={style.animMode === "off"} onChange={(e) => set("animEffect", e.target.value as AnimEffect)}>
+            <select aria-label="Effect" value={style.animEffect} disabled={style.animMode === "off"} onChange={(e) => set("animEffect", e.target.value as AnimEffect)}>
               <option value="rise">Rise from below + blur</option>
               <option value="fade">Fade in</option>
               <option value="pop">Pop (scale up)</option>
@@ -200,20 +209,18 @@ function StylePanel({ style, setStyle }: Props) {
         </div>
       </Section>
 
-      <Section title="Highlight spoken word" toggle={<Switch checked={style.highlight} onChange={(v) => set("highlight", v)} />}>
+      <Section title="Highlight spoken word" toggle={<Switch label="Highlight spoken word" checked={style.highlight} onChange={(v) => set("highlight", v)} />}>
         {style.highlight && (
           <div className="control">
             <div className="inline">
               {color("highlightColor")}
-              <span className="muted" style={{ fontSize: 12 }}>
-                Colour of the word being said right now
-              </span>
+              <span className="muted small-note">Color of the word being said right now</span>
             </div>
           </div>
         )}
       </Section>
 
-      <Section title="Drop shadow" toggle={<Switch checked={style.shadow} onChange={(v) => set("shadow", v)} />}>
+      <Section title="Drop shadow" toggle={<Switch label="Drop shadow" checked={style.shadow} onChange={(v) => set("shadow", v)} />}>
         {style.shadow && (
           <div className="controls">
             <div className="control">
@@ -229,7 +236,7 @@ function StylePanel({ style, setStyle }: Props) {
         )}
       </Section>
 
-      <Section title="Outline" toggle={<Switch checked={style.strokeWidth > 0} onChange={(v) => set("strokeWidth", v ? 12 : 0)} />}>
+      <Section title="Outline" toggle={<Switch label="Outline" checked={style.strokeWidth > 0} onChange={(v) => set("strokeWidth", v ? 12 : 0)} />}>
         {style.strokeWidth > 0 && (
           <div className="controls">
             <div className="control">
@@ -243,7 +250,7 @@ function StylePanel({ style, setStyle }: Props) {
         )}
       </Section>
 
-      <Section title="Background box" toggle={<Switch checked={style.boxOpacity > 0} onChange={(v) => set("boxOpacity", v ? 0.6 : 0)} />}>
+      <Section title="Background box" toggle={<Switch label="Background box" checked={style.boxOpacity > 0} onChange={(v) => set("boxOpacity", v ? 0.6 : 0)} />}>
         {style.boxOpacity > 0 && (
           <div className="controls">
             <div className="control">

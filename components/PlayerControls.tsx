@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Clock } from "@/lib/clock";
 import { fmtTime } from "@/lib/subtitles";
+import Icon from "./Icon";
 
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -52,17 +53,17 @@ export default function PlayerControls({ videoRef, clock, duration, onToggle, se
 
   return (
     <div className="controls-bar">
-      <button className="icon-btn" onClick={() => seek(0)} title="Go to start">
-        ⏮
+      <button className="icon-btn to-start" onClick={() => seek(0)} aria-label="Go to start" title="Go to start">
+        <Icon name="start" />
       </button>
-      <button className="icon-btn" onClick={() => stepFrame(-1 / 30)} title="Previous frame">
-        ‹
+      <button className="icon-btn" onClick={() => stepFrame(-1 / 30)} aria-label="Previous frame" title="Previous frame">
+        <Icon name="prev" />
       </button>
-      <button className="icon-btn play" onClick={onToggle} title="Play / pause (Space)">
-        {playing ? "❚❚" : "▶"}
+      <button className="icon-btn play" onClick={onToggle} aria-label={playing ? "Pause" : "Play"} title="Play / pause (Space)">
+        <Icon name={playing ? "pause" : "play"} />
       </button>
-      <button className="icon-btn" onClick={() => stepFrame(1 / 30)} title="Next frame">
-        ›
+      <button className="icon-btn" onClick={() => stepFrame(1 / 30)} aria-label="Next frame" title="Next frame">
+        <Icon name="next" />
       </button>
       <span className="time">
         <span ref={timeRef}>0:00.00</span> <span className="muted">/ {fmtTime(duration, 2)}</span>
@@ -70,6 +71,7 @@ export default function PlayerControls({ videoRef, clock, duration, onToggle, se
       <span className="spacer" />
       <select
         value={rate}
+        aria-label="Playback speed"
         title="Playback speed"
         onChange={(e) => {
           const r = Number(e.target.value);
@@ -85,7 +87,8 @@ export default function PlayerControls({ videoRef, clock, duration, onToggle, se
       </select>
       <button
         className="icon-btn"
-        title="Mute"
+        aria-label={muted ? "Unmute" : "Mute"}
+        title={muted ? "Unmute" : "Mute"}
         onClick={() => {
           const v = videoRef.current;
           if (!v) return;
@@ -93,7 +96,7 @@ export default function PlayerControls({ videoRef, clock, duration, onToggle, se
           setMuted(v.muted);
         }}
       >
-        {muted ? "🔇" : "🔊"}
+        <Icon name={muted ? "mute" : "volume"} />
       </button>
     </div>
   );

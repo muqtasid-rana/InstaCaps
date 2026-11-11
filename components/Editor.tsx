@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CaptionList from "./CaptionList";
 import ExportPanel from "./ExportPanel";
+import Icon from "./Icon";
 import PlayerControls from "./PlayerControls";
 import StylePanel from "./StylePanel";
 import Timeline from "./Timeline";
@@ -10,10 +11,12 @@ import { decodeMono, encodeWav, SAMPLE_RATE } from "@/lib/audio";
 import { MAX_WORDS, rechunk } from "@/lib/chunking";
 import { Clock } from "@/lib/clock";
 import { loadCaptionFont, renderCaptions, splitWords, wordTimes } from "@/lib/draw";
+import { useAuth } from "@/lib/auth";
 import { useHistory } from "@/lib/history";
 import { alignSegments, analyzeSpeech, type SpeechMap } from "@/lib/speech";
 import { fmtTime } from "@/lib/subtitles";
 import { normalizeStyle, uid, type ChunkMode, type Project, type Segment } from "@/lib/types";
+import { usageLine } from "@/lib/usage";
 
 const MAX_UPLOAD = 4 * 1024 * 1024; // hosting request limit (Vercel: 4.5 MB) for the raw-video fallback
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
@@ -33,6 +36,8 @@ interface Props {
 }
 
 export default function Editor({ project, video, onChange, onClose }: Props) {
+  const { usage, setUsage, authHeaders, configured, user } = useAuth();
+  const outOfGenerations = !!usage && usage.enforced && usage.used >= usage.limit;
   const history = useHistory<Segment[]>(project.segments);
   const { value: segments, set: setSegments, undo, redo } = history;
   const [style, setStyle] = useState(() => normalizeStyle(project.style));
@@ -204,9 +209,11 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
       form.append("chunk", chunkMode);
 
       setBusy("Gemini is listening…");
-      const res = await fetch("/api/captions", { method: "POST", body: form });
+      const res = await fetch("/api/captions", { method: "POST", body: form, headers: await authHeaders() });
       const json = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
+      if (json.code === "quota" && usage) setUsage({ ...usage, used: usage.limit });
       if (!res.ok) throw new Error(json.error || `Server error (${res.status})`);
+      if (json.usage) setUsage(json.usage);
 
       let segs: Segment[] = json.segments.map((s: Omit<Segment, "id">) => ({ ...s, id: uid() }));
       const map = speech ?? (samples ? analyzeSpeech(samples, SAMPLE_RATE) : null);
@@ -306,8 +313,9 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
   return (
     <div className="ed">
       <header className="ed-top">
-        <button className="ghost" onClick={onClose} disabled={exporting}>
-          ← Projects
+        <button className="ghost back-btn" onClick={onClose} disabled={exporting}>
+          <Icon name="back" />
+          <span className="back-label">Projects</span>
         </button>
         <div className="ed-title">
           <strong title={project.name}>{project.name}</strong>
@@ -316,21 +324,24 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
           </span>
         </div>
         <div className="ed-top-actions">
-          <button className="icon-btn" onClick={undo} disabled={!history.canUndo} title="Undo (Ctrl+Z)">
-            ↶
+          <button className="icon-btn" onClick={undo} disabled={!history.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+            <Icon name="undo" />
           </button>
-          <button className="icon-btn" onClick={redo} disabled={!history.canRedo} title="Redo (Ctrl+Shift+Z)">
-            ↷
+          <button className="icon-btn" onClick={redo} disabled={!history.canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
+            <Icon name="redo" />
           </button>
-          <button className="primary" onClick={() => setTab("export")}>
+          <button className="primary pill" onClick={() => setTab("export")}>
             Export
           </button>
         </div>
       </header>
 
       {error && (
-        <div className="error" onClick={() => setError("")} title="Click to dismiss">
-          {error}
+        <div className="error" role="alert">
+          <span>{error}</span>
+          <button className="icon" onClick={() => setError("")} aria-label="Dismiss error">
+            <Icon name="close" size={16} />
+          </button>
         </div>
       )}
 
@@ -346,9 +357,9 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
         </section>
 
         <aside className="ed-side">
-          <nav className="tabs">
+          <nav className="tabs" aria-label="Editor panels">
             {TABS.map(([id, label]) => (
-              <button key={id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+              <button key={id} className={tab === id ? "on" : ""} aria-current={tab === id ? "true" : undefined} onClick={() => setTab(id)}>
                 {label}
               </button>
             ))}
@@ -359,26 +370,28 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
                 <div className="row">
                   <span className="muted">Caption length</span>
                   <div className="seg-toggle">
-                    <button className={chunkMode === "short" ? "on" : ""} onClick={() => changeChunkMode("short")}>
+                    <button className={chunkMode === "short" ? "on" : ""} aria-pressed={chunkMode === "short"} onClick={() => changeChunkMode("short")}>
                       Short · 1–3 words
                     </button>
-                    <button className={chunkMode === "normal" ? "on" : ""} onClick={() => changeChunkMode("normal")}>
+                    <button className={chunkMode === "normal" ? "on" : ""} aria-pressed={chunkMode === "normal"} onClick={() => changeChunkMode("normal")}>
                       Normal · 4–5 words
                     </button>
                   </div>
                 </div>
-                <button className="primary wide" onClick={generate} disabled={!!busy || exporting}>
-                  {busy ? (
-                    <>
-                      <span className="spinner" />
-                      {busy}
-                    </>
-                  ) : segments.length ? (
-                    "✨ Regenerate captions"
-                  ) : (
-                    "✨ Generate captions"
-                  )}
+                <button
+                  className={`generate${segments.length ? " secondary" : ""}`}
+                  onClick={generate}
+                  disabled={!!busy || exporting || outOfGenerations || (configured && !user)}
+                  aria-describedby="usage-line"
+                >
+                  <span className="generate-disc" aria-hidden="true">
+                    {busy ? <span className="spinner" /> : <Icon name="captions" />}
+                  </span>
+                  {busy ?? (segments.length ? "Regenerate captions" : "Generate captions")}
                 </button>
+                <p id="usage-line" className="usage-line">
+                  {configured && !user ? "Log in to generate captions" : usage ? usageLine(usage) : " "}
+                </p>
                 {notice && <p className="notice">{notice}</p>}
               </div>
               <CaptionList
@@ -422,21 +435,26 @@ export default function Editor({ project, video, onChange, onClose }: Props) {
         toolbar={
           <>
             <button className="small" onClick={splitAtPlayhead} title="Split the caption under the playhead (S)">
-              ✂ Split
+              <Icon name="split" size={16} />
+              Split
             </button>
             <button className="small" onClick={autoSync} disabled={!speech || !segments.length} title="Snap caption timings to your voice">
-              ⚡ Auto-sync
+              <Icon name="sync" size={16} />
+              Auto-sync
             </button>
             <div className="nudge">
               <span className="muted">Shift all</span>
-              <button className="small" onClick={() => nudgeAll(-0.05)} title="Every caption 50 ms earlier">
-                −50ms
+              <button className="small" onClick={() => nudgeAll(-0.05)} aria-label="Shift all captions 50 ms earlier" title="Every caption 50 ms earlier">
+                −50 ms
               </button>
-              <button className="small" onClick={() => nudgeAll(0.05)} title="Every caption 50 ms later">
-                +50ms
+              <button className="small" onClick={() => nudgeAll(0.05)} aria-label="Shift all captions 50 ms later" title="Every caption 50 ms later">
+                +50 ms
               </button>
             </div>
-            <span className="muted kbd-hint">Space play · ←/→ seek · S split · Del delete · Ctrl+Z undo · drag blocks to retime</span>
+            <span className="kbd-hint">
+              <kbd>Space</kbd> play <kbd>←</kbd>
+              <kbd>→</kbd> seek <kbd>S</kbd> split <kbd>Del</kbd> delete <kbd>Ctrl Z</kbd> undo
+            </span>
           </>
         }
       />

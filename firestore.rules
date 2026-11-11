@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// users/{uid} holds each account's caption-generation allowance:
+//   generationsUsed (number), generationsLimit (number, default 2), email, createdAt, lastGenerationAt
+// Only the server (Admin SDK, which bypasses these rules) changes it, so a person can read their own
+// usage but can never raise their own limit.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
